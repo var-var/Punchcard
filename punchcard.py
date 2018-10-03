@@ -1,9 +1,14 @@
 from datetime import date, time, datetime, timedelta
 import urllib.request
 import json
+import argparse
+
+parser = argparse.ArgumentParser(description='Simple github punchcard')
+parser.add_argument('-u', '--username', action="store", dest="username", help='github username', required=True)
+args = parser.parse_args()
 
 ## Constants:
-username = input("Enter username: \n")
+username = args.username
 url_repos = 'https://api.github.com/users/%s/repos' % username
 
 
