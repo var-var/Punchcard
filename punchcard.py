@@ -1,6 +1,6 @@
 from datetime import date, time, datetime, timedelta
 import urllib.request
-import re
+import json
 
 ## Constants:
 username = input("Enter username: \n")
@@ -60,35 +60,27 @@ def render_table(lon):
 
 ## string -> [listof numbers]
 ## Consume repos name and produce list of values with days, hours and commit's counts
-##     lov is list of values [[a, b], c], where
+##     lov is list of values [[a, b], c];
 ##                             a is Natural[0, 6]: 0 means Monday, 1 means Tuesday ... 6 means Sunday
 ##                             b is Natural[0, 23]: interp. hours
 ##                             c is Natural[0, ...]: interp. commit's count
 def punch_card(repo):
-    ## Open connection:
     req_comm = urllib.request.Request('https://api.github.com/repos/%s/%s/commits' % (username, repo))
     req_comm.add_header('User-Agent', 'Mozilla/5.0')
     open_req_comm = urllib.request.urlopen(req_comm)
     data_comm_raw = (open_req_comm.read().decode('utf-8'))
+    json_obj = json.loads(data_comm_raw)
 
-    ## Find all strings with commits and put it into 'newdata' lst
-    comp = re.compile(r'commit":(.*?)}')
-    newdata = (comp.findall(data_comm_raw))
-
-    ## Convert all strings in 'newdata' lst into datetime format
-    for i, s in enumerate(newdata):
-        start_ind = (s.find("date"))
-        newdata[i] = datetime.strptime(s[start_ind + 7:-1], "%Y-%m-%dT%H:%M:%SZ") + timedelta(hours=5)
-    ## Choose only 365 days ago
-    for i, s in enumerate(newdata):
-        if s < datetime.now() and s > (datetime.now() - timedelta(days=365)):
-            newdata[i] = s
-        newdata[i] = [(datetime.weekday(s)), (datetime.time(s).hour)]
+    newdata = []
+    for i, s in enumerate(json_obj):
+        comm_info = (json_obj[i]['commit']['author']).get('date')
+        dt_comm_info = datetime.strptime(comm_info, "%Y-%m-%dT%H:%M:%SZ") + timedelta(hours=5)
+        if dt_comm_info < datetime.now() and dt_comm_info > (datetime.now() - timedelta(days=365)):
+            newdata.append([(datetime.weekday(dt_comm_info)), (datetime.time(dt_comm_info).hour)])
 
     newdata_2 = []
     for i, s in enumerate(newdata):
         newdata_2.insert(i, newdata.count(s))
-
     for i, s in enumerate(newdata):
         newdata[i] = [s, newdata_2[i]]
     lov = []
@@ -96,7 +88,7 @@ def punch_card(repo):
         if i not in lov:
             lov.append(i)
     lov.sort()
-    # print("FINAL : " + str(lov))
+
     render_table(lov)
 
 
@@ -120,22 +112,19 @@ def activity(data_repo):
 ## Produce filtered string with repos names (using reg ex)
 ##         lor means list of repos
 def lst_of_repname(data_raw):
-    comp = re.compile(r'full_name":(.*?),')
-    lor = (comp.findall(data_raw))
-    for i, s in enumerate(lor):
-        lor[i] = s[(len(username) + 2):-1]
+    json_obj_r = json.loads(data_raw)
+    lor = []
+    for i, s in enumerate(json_obj_r):
+        lor.append(json_obj_r[i]['name'])
     return lor
-    print(lor)
 
 
 ## Username -> string
 ## Consume username and produce full commits data (data_repo_raw)
 def main(username):
-    ## Open connection:
     req_rep = urllib.request.Request(url_repos)
     req_rep.add_header('User-Agent', 'Mozilla/5.0')
     open_req_rep = urllib.request.urlopen(req_rep)
-    ## Get data:
     data_repo_raw = (open_req_rep.read().decode('utf-8'))
 
     activity(data_repo_raw)
